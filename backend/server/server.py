@@ -121,23 +121,34 @@ async def read_report(request: Request, research_id: str):
 
 
 async def write_report(research_request: ResearchRequest, research_id: str = None):
-    report_information = await run_agent(
-        task=research_request.task,
-        report_type=research_request.report_type,
-        report_source=research_request.report_source,
-        source_urls=[],
-        document_urls=[],
-        tone=Tone[research_request.tone],
-        websocket=None,
-        stream_output=None,
-        headers=research_request.headers,
-        query_domains=[],
-        config_path="",
-        return_researcher=True
-    )
+    if not research_id:
+        raise ValueError("research_id must be provided")
 
-    docx_path = await write_md_to_word(report_information[0], research_id)
-    pdf_path = await write_md_to_pdf(report_information[0], research_id)
+    try:
+        # Генерация отчета
+        report_information = await run_agent(
+            task=research_request.task,
+            report_type=research_request.report_type,
+            report_source=research_request.report_source,
+            source_urls=[],
+            document_urls=[],
+            tone=Tone[research_request.tone],
+            websocket=None,
+            stream_output=None,
+            headers=research_request.headers,
+            query_domains=[],
+            config_path="",
+            return_researcher=True
+        )
+
+        # Сохранение файлов
+        docx_path = await write_md_to_word(report_information[0], research_id)
+        pdf_path = await write_md_to_pdf(report_information[0], research_id)
+
+    except Exception as e:
+        logger.error(f"Error while generating report: {e}")
+        raise ValueError("Failed to generate report. Please try again later.")
+
     if research_request.report_type != "multi_agents":
         report, researcher = report_information
         response = {
@@ -147,14 +158,13 @@ async def write_report(research_request: ResearchRequest, research_id: str = Non
                 "research_costs": researcher.get_costs(),
                 "visited_urls": list(researcher.visited_urls),
                 "research_images": researcher.get_research_images(),
-                # "research_sources": researcher.get_research_sources(),  # Raw content of sources may be very large
             },
             "report": report,
             "docx_path": docx_path,
             "pdf_path": pdf_path
         }
     else:
-        response = { "research_id": research_id, "report": "", "docx_path": docx_path, "pdf_path": pdf_path }
+        response = {"research_id": research_id, "report": "", "docx_path": docx_path, "pdf_path": pdf_path}
 
     return response
 
@@ -162,10 +172,10 @@ async def write_report(research_request: ResearchRequest, research_id: str = Non
 async def generate_report(
     research_request: ResearchRequest,
     background_tasks: BackgroundTasks,
-    research_id: Optional[str] = None  # Добавляем параметр research_id
+    research_id: Optional[str] = None
 ):
-    # Если research_id не передан, генерируем его автоматически
-    research_id = research_id or sanitize_filename(f"task_{int(time.time())}_{research_request.task}")
+    # Если research_id передан, очищаем его от недопустимых символов
+    research_id = sanitize_filename(research_id) if research_id else sanitize_filename(f"task_{int(time.time())}_{research_request.task}")
 
     if research_request.generate_in_background:
         background_tasks.add_task(write_report, research_request=research_request, research_id=research_id)
@@ -187,16 +197,18 @@ async def get_reports_status():
     if not os.path.exists("outputs"):
         return {"message": "No reports found."}
 
-    # Get all files in the outputs directory
     files = os.listdir("outputs")
+    completed_reports = []
+    in_progress_reports = []
 
-    # Classify files into completed and in-progress
-    completed_reports = [
-        file for file in files if file.endswith(".docx") or file.endswith(".pdf")
-    ]
-    in_progress_reports = [
-        file for file in files if file.endswith(".json")
-    ]
+    for file in files:
+        file_path = os.path.join("outputs", file)
+        if not os.path.isfile(file_path):
+            continue  # Пропускаем, если это не файл
+        if file.endswith(".docx") or file.endswith(".pdf"):
+            completed_reports.append(file)
+        elif file.endswith(".json"):
+            in_progress_reports.append(file)
 
     return {
         "completed_reports": completed_reports,
@@ -229,12 +241,21 @@ async def clear_all_reports():
     if not os.path.exists("outputs"):
         return {"message": "No reports to delete."}
 
-    # Get all files in the outputs directory
     files = os.listdir("outputs")
+    errors = []
 
-    # Use the existing handle_file_deletion method to delete each file
     for file in files:
-        await handle_file_deletion(file, "outputs")
+        try:
+            await handle_file_deletion(file, "outputs")
+        except Exception as e:
+            logger.error(f"Failed to delete file {file}: {e}")
+            errors.append(file)
+
+    if errors:
+        return {
+            "message": "Some files could not be deleted.",
+            "failed_files": errors
+        }
 
     return {"message": "All reports have been deleted."}
 
