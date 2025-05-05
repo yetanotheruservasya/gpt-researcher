@@ -18,7 +18,7 @@ from backend.server.server_utils import (
 )
 
 from backend.server.websocket_manager import run_agent
-from backend.utils import write_md_to_word, write_md_to_pdf
+from backend.utils import write_md_to_word, write_md_to_pdf, write_text_to_md
 from gpt_researcher.utils.logging_config import setup_research_logging
 from gpt_researcher.utils.enum import Tone
 
@@ -144,6 +144,7 @@ async def write_report(research_request: ResearchRequest, research_id: str = Non
         # Сохранение файлов
         docx_path = await write_md_to_word(report_information[0], research_id)
         pdf_path = await write_md_to_pdf(report_information[0], research_id)
+        md_path = await write_text_to_md(report_information[0], research_id)  # Save as Markdown
 
     except Exception as e:
         logger.error(f"Error while generating report: {e}")
