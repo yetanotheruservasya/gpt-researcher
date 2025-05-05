@@ -174,8 +174,8 @@ async def generate_report(
     background_tasks: BackgroundTasks,
     research_id: Optional[str] = None
 ):
-    # Если research_id передан, очищаем его от недопустимых символов
-    research_id = sanitize_filename(research_id) if research_id else sanitize_filename(f"task_{int(time.time())}_{research_request.task}")
+    # Если research_id не передан, генерируем его автоматически
+    research_id = research_id or f"task_{int(time.time())}_{research_request.task}"
 
     if research_request.generate_in_background:
         background_tasks.add_task(write_report, research_request=research_request, research_id=research_id)
