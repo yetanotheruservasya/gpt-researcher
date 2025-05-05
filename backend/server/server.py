@@ -177,6 +177,32 @@ async def generate_report(
         response = await write_report(research_request, research_id)
         return response
 
+@app.get("/reports/status")
+async def get_reports_status():
+    """
+    Returns the status of all reports:
+    - Completed reports (.docx and .pdf)
+    - In-progress reports (.json)
+    """
+    if not os.path.exists("outputs"):
+        return {"message": "No reports found."}
+
+    # Get all files in the outputs directory
+    files = os.listdir("outputs")
+
+    # Classify files into completed and in-progress
+    completed_reports = [
+        file for file in files if file.endswith(".docx") or file.endswith(".pdf")
+    ]
+    in_progress_reports = [
+        file for file in files if file.endswith(".json")
+    ]
+
+    return {
+        "completed_reports": completed_reports,
+        "in_progress_reports": in_progress_reports
+    }
+
 @app.get("/files/")
 async def list_files():
     if not os.path.exists(DOC_PATH):
