@@ -113,11 +113,22 @@ async def read_root(request: Request):
 
 
 @app.get("/report/{research_id}")
-async def read_report(request: Request, research_id: str):
-    docx_path = os.path.join('outputs', f"{research_id}.docx")
-    if not os.path.exists(docx_path):
-        return {"message": "Report not found."}
-    return FileResponse(docx_path)
+async def read_report(request: Request, research_id: str, file_type: str = "docx"):
+    """
+    Returns the requested report file (docx, pdf, or md) based on the file_type parameter.
+    """
+    # Validate the file type
+    file_extension = file_type.lower()
+    if file_extension not in ["docx", "pdf", "md"]:
+        return {"message": "Invalid file type. Supported types are: docx, pdf, md."}
+
+    # Construct the file path
+    file_path = os.path.join('outputs', f"{research_id}.{file_extension}")
+    if not os.path.exists(file_path):
+        return {"message": f"Report with {file_extension} format not found."}
+
+    # Return the file
+    return FileResponse(file_path)
 
 
 async def write_report(research_request: ResearchRequest, research_id: str = None):
@@ -192,7 +203,7 @@ async def generate_report(
 async def get_reports_status():
     """
     Returns the status of all reports:
-    - Completed reports (.docx and .pdf)
+    - Completed reports (.docx, .pdf, and .md)
     - In-progress reports (.json)
     """
     if not os.path.exists("outputs"):
@@ -205,8 +216,8 @@ async def get_reports_status():
     for file in files:
         file_path = os.path.join("outputs", file)
         if not os.path.isfile(file_path):
-            continue  # Пропускаем, если это не файл
-        if file.endswith(".docx") or file.endswith(".pdf"):
+            continue  # Skip if it's not a file
+        if file.endswith(".docx") or file.endswith(".pdf") or file.endswith(".md"):
             completed_reports.append(file)
         elif file.endswith(".json"):
             in_progress_reports.append(file)
