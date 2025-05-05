@@ -221,6 +221,22 @@ async def run_multi_agents():
 async def upload_file(file: UploadFile = File(...)):
     return await handle_file_upload(file, DOC_PATH)
 
+@app.delete("/reports/clear")
+async def clear_all_reports():
+    """
+    Deletes all reports (both completed and in-progress) from the 'outputs' directory.
+    """
+    if not os.path.exists("outputs"):
+        return {"message": "No reports to delete."}
+
+    # Get all files in the outputs directory
+    files = os.listdir("outputs")
+
+    # Use the existing handle_file_deletion method to delete each file
+    for file in files:
+        await handle_file_deletion(file, "outputs")
+
+    return {"message": "All reports have been deleted."}
 
 @app.delete("/files/{filename}")
 async def delete_file(filename: str):
