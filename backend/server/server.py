@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 import time
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, File, UploadFile, BackgroundTasks
@@ -159,17 +159,23 @@ async def write_report(research_request: ResearchRequest, research_id: str = Non
     return response
 
 @app.post("/report/")
-async def generate_report(research_request: ResearchRequest, background_tasks: BackgroundTasks):
-    research_id = sanitize_filename(f"task_{int(time.time())}_{research_request.task}")
+async def generate_report(
+    research_request: ResearchRequest,
+    background_tasks: BackgroundTasks,
+    research_id: Optional[str] = None  # Добавляем параметр research_id
+):
+    # Если research_id не передан, генерируем его автоматически
+    research_id = research_id or sanitize_filename(f"task_{int(time.time())}_{research_request.task}")
 
     if research_request.generate_in_background:
         background_tasks.add_task(write_report, research_request=research_request, research_id=research_id)
-        return {"message": "Your report is being generated in the background. Please check back later.",
-                "research_id": research_id}
+        return {
+            "message": "Your report is being generated in the background. Please check back later.",
+            "research_id": research_id
+        }
     else:
         response = await write_report(research_request, research_id)
         return response
-
 
 @app.get("/files/")
 async def list_files():
